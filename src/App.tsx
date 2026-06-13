@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { EmployerDashboard } from './components/EmployerDashboard';
-import { EmployeeDashboard } from './components/EmployeeDashboard';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -9,12 +7,12 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
       if (session) checkUserRole(session.user);
       else setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: any) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       setUser(session?.user ?? null);
       if (session) checkUserRole(session.user);
       else {
@@ -27,8 +25,8 @@ export default function App() {
   }, []);
 
   async function checkUserRole(currentUser: any) {
-    // VERVANG DIT DOOR JOUW EIGEN GMAIL ADRES
-    const isEmployer = currentUser.email === 'JOUW_EIGEN_GMAIL@gmail.com';
+    // Vul hier je eigen Gmail-adres in voor admin-toegang
+    const isEmployer = currentUser.email === 'admin@dynasty.com';
 
     if (isEmployer) {
       setUserRole('employer');
@@ -36,53 +34,45 @@ export default function App() {
       return;
     }
 
-    let { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', currentUser.id)
-      .single();
-
-    if (!profile) {
-      const { data: newProfile } = await supabase
+    try {
+      const { data: profile } = await supabase
         .from('profiles')
-        .insert([{ id: currentUser.id, email: currentUser.email, role: 'employee' }])
-        .select()
+        .select('role')
+        .eq('id', currentUser.id)
         .single();
-      
-      setUserRole(newProfile?.role || 'employee');
-    } else {
-      setUserRole(profile.role);
+
+      if (!profile) {
+        const { data: newProfile } = await supabase
+          .from('profiles')
+          .insert([{ id: currentUser.id, email: currentUser.email, role: 'employee' }])
+          .select()
+          .single();
+        
+        setUserRole(newProfile?.role || 'employee');
+      } else {
+        setUserRole(profile.role);
+      }
+    } catch (err) {
+      console.error("Fout bij ophalen rol:", err);
+      setUserRole('employee');
     }
     setLoading(false);
   }
 
-  async function handleLogin() {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-    });
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    setUser(null);
-    setUserRole(null);
-  }
-
   if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif' }}>
-        <h3>Dynasty Uren laden...</h3>
-      </div>
-    );
+    return <div style={{ padding: 50, textAlign: 'center', fontFamily: 'sans-serif', color: '#fff', backgroundColor: '#1a1a1a', height: '100vh' }}><h3>Dynasty Uren laden...</h3></div>;
   }
 
   if (!user) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', backgroundColor: '#f5f5f5' }}>
-        <div style={{ backgroundColor: '#fff', padding: '40px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-          <h1 style={{ color: '#1a1a1a', marginBottom: '10px' }}>Dynasty Urenregistratie</h1>
-          <p style={{ color: '#666', marginBottom: '30px' }}>Log in met je werk-Gmail om uren te schrijven of in te zien.</p>
-          <button onClick={handleLogin} style={{ backgroundColor: '#4285F4', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '4px', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold' }}>
+      <div style={{ padding: 50, textAlign: 'center', fontFamily: 'sans-serif', height: '100vh', backgroundColor: '#f5f5f5', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ background: '#fff', padding: 40, borderRadius: 8, boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+          <h2>Dynasty Urenregistratie</h2>
+          <p>Log in met je Google-account.</p>
+          <button 
+            onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
+            style={{ padding: '12px 24px', fontSize: 16, cursor: 'pointer', backgroundColor: '#4285F4', color: '#fff', border: 'none', borderRadius: 4, fontWeight: 'bold' }}
+          >
             Inloggen met Google
           </button>
         </div>
@@ -91,19 +81,26 @@ export default function App() {
   }
 
   return (
-    <div>
-      <div style={{ backgroundColor: '#1a1a1a', color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'between', alignItems: 'center', fontFamily: 'sans-serif' }}>
-        <span style={{ fontWeight: 'bold' }}>Dynasty Uren - Ingelogd als: {user.email}</span>
-        <button onClick={handleLogout} style={{ backgroundColor: '#d32f2f', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', marginLeft: 'auto' }}>
-          Uitloggen
-        </button>
+    <div style={{ fontFamily: 'sans-serif', padding: 20, minHeight: '100vh', backgroundColor: '#fafafa' }}>
+      <div style={{ background: '#1a1a1a', color: '#fff', padding: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 4 }}>
+        <span>Ingelogd als: {user.email} (Rol: {userRole})</span>
+        <button onClick={() => supabase.auth.signOut()} style={{ cursor: 'pointer', padding: '5px 10px', backgroundColor: '#d32f2f', color: '#fff', border: 'none', borderRadius: 4 }}>Uitloggen</button>
       </div>
 
-      {userRole === 'employer' ? (
-        <EmployerDashboard />
-      ) : (
-        <EmployeeDashboard userId={user.id} />
-      )}
+      <div style={{ marginTop: 20, padding: 20, border: '1px solid #ccc', borderRadius: 4, backgroundColor: '#fff' }}>
+        <h3>Dashboard Informatie</h3>
+        {userRole === 'employer' ? (
+          <div>
+            <p>📢 Je bent ingelogd als Werkgever.</p>
+            <p style={{ color: '#666', fontStyle: 'italic' }}>Koppel hier later je EmployerDashboard component aan.</p>
+          </div>
+        ) : (
+          <div>
+            <p>⏱️ Je bent ingelogd als Werknemer.</p>
+            <p style={{ color: '#666', fontStyle: 'italic' }}>Koppel hier later je EmployeeDashboard component aan.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
