@@ -1,54 +1,51 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import EmployerDashboard from './components/EmployerDashboard';
-import EmployeeDashboard from './components/EmployeeDashboard';
+import { EmployerDashboard } from './components/EmployerDashboard';
+import { EmployeeDashboard } from './components/EmployeeDashboard';
 
 export default function App() {
-  const [session, setSession] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Luister naar in- en uitloggen
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
       if (session) checkUserRole(session.user);
       else setLoading(false);
     });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: any) => {
+      setUser(session?.user ?? null);
       if (session) checkUserRole(session.user);
       else {
         setUserRole(null);
         setLoading(false);
       }
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Automatische aanmaak en check van rol bij Gmail Login
-  async function checkUserRole(user: any) {
+  async function checkUserRole(currentUser: any) {
+    // VERVANG DIT DOOR JOUW EIGEN GMAIL ADRES
+    const isEmployer = currentUser.email === 'JOUW_EIGEN_GMAIL@gmail.com';
+
+    if (isEmployer) {
+      setUserRole('employer');
+      setLoading(false);
+      return;
+    }
+
     let { data: profile } = await supabase
       .from('profiles')
       .select('role')
-      .eq('id', user.id)
+      .eq('id', currentUser.id)
       .single();
 
-    // Als de werknemer voor het eerst inlogt via Gmail, bestaat het profiel nog niet
     if (!profile) {
-      // Vul hier JOUW eigen Gmail in om jezelf automatisch als werkgever te markeren!
-      const isEmployer = user.email === 'JOUW_EIGEN_GMAIL@gmail.com'; 
-      
       const { data: newProfile } = await supabase
         .from('profiles')
-        .insert([
-          { 
-            id: user.id, 
-            email: user.email, 
-            full_name: user.user_metadata.full_name || 'Nieuwe Werknemer',
-            role: isEmployer ? 'employer' : 'employee' 
-          }
-        ])
+        .insert([{ id: currentUser.id, email: currentUser.email, role: 'employee' }])
         .select()
         .single();
       
@@ -59,34 +56,53 @@ export default function App() {
     setLoading(false);
   }
 
-  const loginWithGoogle = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'google' });
-  };
+  async function handleLogin() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+    });
+  }
 
-  if (loading) return <div className="flex h-screen items-center justify-center">Laden...</div>;
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    setUser(null);
+    setUserRole(null);
+  }
 
-  // Als er niemand is ingelogd, toon het Gmail inlogscherm
-  if (!session) {
+  if (loading) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-gray-50">
-        <h1 className="text-2xl font-bold mb-6">Urenregistratie Login</h1>
-        <button 
-          onClick={loginWithGoogle}
-          className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition"
-        >
-          Inloggen met Gmail
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif' }}>
+        <h3>Dynasty Uren laden...</h3>
       </div>
     );
   }
 
-  // Toon dashboard op basis van de rol in de database
+  if (!user) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', backgroundColor: '#f5f5f5' }}>
+        <div style={{ backgroundColor: '#fff', padding: '40px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+          <h1 style={{ color: '#1a1a1a', marginBottom: '10px' }}>Dynasty Urenregistratie</h1>
+          <p style={{ color: '#666', marginBottom: '30px' }}>Log in met je werk-Gmail om uren te schrijven of in te zien.</p>
+          <button onClick={handleLogin} style={{ backgroundColor: '#4285F4', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '4px', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold' }}>
+            Inloggen met Google
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
+      <div style={{ backgroundColor: '#1a1a1a', color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'between', alignItems: 'center', fontFamily: 'sans-serif' }}>
+        <span style={{ fontWeight: 'bold' }}>Dynasty Uren - Ingelogd als: {user.email}</span>
+        <button onClick={handleLogout} style={{ backgroundColor: '#d32f2f', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', marginLeft: 'auto' }}>
+          Uitloggen
+        </button>
+      </div>
+
       {userRole === 'employer' ? (
-        <EmployerDashboard session={session} />
+        <EmployerDashboard />
       ) : (
-        <EmployeeDashboard session={session} />
+        <EmployeeDashboard userId={user.id} />
       )}
     </div>
   );
