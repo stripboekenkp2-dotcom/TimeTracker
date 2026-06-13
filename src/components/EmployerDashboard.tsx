@@ -1,6 +1,7 @@
 import React from "react";
 
-export default function EmployerDashboard() {
+// Let op: 'export function' in plaats van 'export default function'
+export function EmployerDashboard() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Dashboard Header */}

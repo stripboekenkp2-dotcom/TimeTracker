@@ -8,13 +8,14 @@ interface TimeEntry {
   status: "pending" | "approved" | "rejected";
 }
 
-export default function EmployeeDashboard() {
+// Let op: 'export function' in plaats van 'export default function'
+export function EmployeeDashboard() {
   // State voor het formulier
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [hours, setHours] = useState("");
   const [description, setDescription] = useState("");
   
-  // Tijdelijke mock data voor de tabel (later te koppelen aan Supabase)
+  // Tijdelijke mock data voor de tabel
   const [entries, setEntries] = useState<TimeEntry[]>([
     {
       id: "1",
